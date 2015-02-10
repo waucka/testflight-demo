@@ -102,7 +102,7 @@ func (self *ApiSuite) loadTestData(c *C) {
 	self.chan1Rec = &ChannelJSONRecord{
 		Slug: "test-channel-1",
 		Title: "Test Channel 1",
-		Items: make([]ItemJSONRecord, 0),
+		Items: make([]*ItemJSONRecord, 0),
 	}
 	createChannel(
 		self.chan1Rec.Slug,
@@ -113,7 +113,7 @@ func (self *ApiSuite) loadTestData(c *C) {
 	self.chan2Rec = &ChannelJSONRecord{
 		Slug: "test-channel-2",
 		Title: "Test Channel 2",
-		Items: make([]ItemJSONRecord, 0),
+		Items: make([]*ItemJSONRecord, 0),
 	}
 	createChannel(
 		self.chan2Rec.Slug,

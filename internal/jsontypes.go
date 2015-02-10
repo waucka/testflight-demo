@@ -19,5 +19,5 @@ type ItemJSONRecord struct {
 type ChannelJSONRecord struct {
 	Slug string `json:"slug"`
 	Title string `json:"title"`
-	Items []ItemJSONRecord `json:"items"`
+	Items []*ItemJSONRecord `json:"items"`
 }
