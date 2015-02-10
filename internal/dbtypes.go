@@ -9,6 +9,13 @@ type UserDBRecord struct {
 	Subscriptions []string "subscriptions"
 }
 
+func (self *UserDBRecord) ToJSON() *UserJSONRecord {
+	return &UserJSONRecord{
+		Username: self.Username,
+		Subscriptions: self.Subscriptions,
+	}
+}
+
 type ItemDBRecord struct {
 	Slug string "_id,omitempty"
 	Title string "title"
@@ -17,8 +24,29 @@ type ItemDBRecord struct {
 	Uploader string "uploader"
 }
 
+func (self *ItemDBRecord) ToJSON() *ItemJSONRecord {
+	return &ItemJSONRecord{
+		Slug: self.Slug,
+		Title: self.Title,
+		DateUploaded: self.DateUploaded,
+		Uploader: self.Uploader,
+	}
+}
+
 type ChannelDBRecord struct {
 	Slug string "_id,omitempty"
 	Title string "title"
 	Items []ItemDBRecord "items"
+}
+
+func (self *ChannelDBRecord) ToJSON() *ChannelJSONRecord {
+	items := make([]*ItemJSONRecord, 0)
+	for _, item := range(self.Items) {
+		items = append(items, item.ToJSON())
+	}
+	return &ChannelJSONRecord{
+		Slug: self.Slug,
+		Title: self.Title,
+		Items: items,
+	}
 }

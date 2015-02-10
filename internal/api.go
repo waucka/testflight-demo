@@ -57,7 +57,16 @@ func (self *Config) GetChannelList(c *gin.Context) {
 }
 
 func (self *Config) GetChannelInfo(c *gin.Context) {
-	InternalError("Not implemented")
+	_ = forceAuth(c)
+	slug := c.Params.ByName("slug")
+	var chanRec ChannelDBRecord
+	err := self.chancoll.FindId(slug).One(&chanRec)
+	if err == mgo.ErrNotFound {
+		NotFound("No such channel " + slug)
+	} else if err != nil {
+		InternalError("Could not fetch channel info from database")
+	}
+	c.JSON(http.StatusOK, chanRec.ToJSON())
 }
 
 func (self *Config) GetChannelItemList(c *gin.Context) {
