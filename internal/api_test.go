@@ -94,8 +94,10 @@ func (self *ApiSuite) loadTestData(c *C) {
 	c.Log("Loading test data...")
 	dataDir := os.Getenv("TEST_DATADIR")
 
-	createUser(self.user1.Username, self.apiConfig.usercoll)
-	createUser(self.user2.Username, self.apiConfig.usercoll)
+	_, err := createUser(self.user1.Username, self.apiConfig.usercoll)
+	c.Assert(err, IsNil)
+	_, err = createUser(self.user2.Username, self.apiConfig.usercoll)
+	c.Assert(err, IsNil)
 	//Intentionally omitted; we don't want this user to exist.
 	//createUser(self.baduser1.Username, self.apiConfig.usercoll)
 
@@ -154,6 +156,7 @@ func (self *ApiSuite) loadTestData(c *C) {
 func (self *ApiSuite) TearDownSuite(c *C) {
 	err := self.apiConfig.db.DropDatabase()
 	c.Assert(err, IsNil)
+	c.Log("Dropped testing database")
 }
 
 func (self *ApiSuite) SetUpSuite(c *C) {
