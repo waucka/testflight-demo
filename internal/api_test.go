@@ -171,6 +171,15 @@ func (self *ApiSuite) SetUpSuite(c *C) {
 	self.loadTestData(c)
 }
 
+func (self *ApiSuite) badAuthDo(requester *testflight.Requester, verb, route, authHeader, authHeaderContents string) (*testflight.Response, error) {
+	req, err := http.NewRequest(verb, route, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Add(authHeader, authHeaderContents)
+	return requester.Do(req), nil
+}
+
 func (self *ApiSuite) authDo(requester *testflight.Requester, username, verb, route string, body []byte) (*testflight.Response, error) {
 	var bodyReader io.Reader = nil
 	if body != nil {
@@ -192,9 +201,66 @@ func (self *ApiSuite) authPost(requester *testflight.Requester, username, route 
 	return self.authDo(requester, username, "POST", route, body)
 }
 
-func (self *ApiSuite) TestGetChannelListBadAuth(c *C) {
+func (self *ApiSuite) TestGetChannelListBadUser(c *C) {
     testflight.WithServer(self.apiConfig.GetRouter(), func(r *testflight.Requester) {
 	    response, err := self.authGet(r, self.baduser1.Username, "/channel")
+	    c.Assert(err, IsNil)
+	    c.Assert(response.StatusCode, Equals, http.StatusUnauthorized)
+    })
+}
+
+func (self *ApiSuite) TestGetChannelListBadAuthHeaderName(c *C) {
+    testflight.WithServer(self.apiConfig.GetRouter(), func(r *testflight.Requester) {
+	    response, err := self.badAuthDo(r, "GET", "/channel", "Auhorization", "Bearer SUP3R_S33CR37:" + self.user1.Username)
+	    c.Assert(err, IsNil)
+	    c.Assert(response.StatusCode, Equals, http.StatusUnauthorized)
+    })
+}
+
+func (self *ApiSuite) TestGetChannelListBadAuthType(c *C) {
+    testflight.WithServer(self.apiConfig.GetRouter(), func(r *testflight.Requester) {
+	    response, err := self.badAuthDo(r, "GET", "/channel", "Authorization", "FNORD SUP3R_S33CR37:" + self.user1.Username)
+	    c.Assert(err, IsNil)
+	    c.Assert(response.StatusCode, Equals, http.StatusBadRequest)
+    })
+}
+
+func (self *ApiSuite) TestGetChannelListBadAuthSecret(c *C) {
+    testflight.WithServer(self.apiConfig.GetRouter(), func(r *testflight.Requester) {
+	    response, err := self.badAuthDo(r, "GET", "/channel", "Authorization", "Bearer SUP3R_S3CR37:" + self.user1.Username)
+	    c.Assert(err, IsNil)
+	    c.Assert(response.StatusCode, Equals, http.StatusBadRequest)
+    })
+}
+
+func (self *ApiSuite) TestGetChannelListBadAuthNoSecret(c *C) {
+    testflight.WithServer(self.apiConfig.GetRouter(), func(r *testflight.Requester) {
+	    response, err := self.badAuthDo(r, "GET", "/channel", "Authorization", "TROLOLOL:" + self.user1.Username)
+	    c.Assert(err, IsNil)
+	    c.Assert(response.StatusCode, Equals, http.StatusBadRequest)
+    })
+}
+
+func (self *ApiSuite) TestGetChannelListBadAuthNoUser(c *C) {
+    testflight.WithServer(self.apiConfig.GetRouter(), func(r *testflight.Requester) {
+	    response, err := self.badAuthDo(r, "GET", "/channel", "Authorization", "Bearer SUP3R_S33CR37")
+	    c.Assert(err, IsNil)
+	    c.Assert(response.StatusCode, Equals, http.StatusBadRequest)
+    })
+}
+
+func (self *ApiSuite) TestGetChannelListGoodAuth(c *C) {
+    testflight.WithServer(self.apiConfig.GetRouter(), func(r *testflight.Requester) {
+	    response, err := self.authGet(r, self.user1.Username, "/channel")
+	    c.Assert(err, IsNil)
+	    c.Log(response.Body)
+	    c.Assert(response.StatusCode, Equals, http.StatusOK)
+    })
+}
+
+func (self *ApiSuite) TestGetChannelInfoBadAuth(c *C) {
+    testflight.WithServer(self.apiConfig.GetRouter(), func(r *testflight.Requester) {
+	    response, err := self.authGet(r, self.baduser1.Username, "/channel/" + self.chan1Rec.Slug)
 	    c.Assert(err, IsNil)
 	    c.Assert(response.StatusCode, Equals, http.StatusUnauthorized)
     })
