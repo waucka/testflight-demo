@@ -35,7 +35,7 @@ func MiddlewareAuth(usercoll *mgo.Collection) gin.HandlerFunc {
 			username := tokenParts[1]
 			log.Printf("Good token for user %s", username)
 			var userRec UserDBRecord
-			err := usercoll.FindId(username).One(userRec)
+			err := usercoll.FindId(username).One(&userRec)
 			if err != nil {
 				Unauthorized("No such user " + username)
 			}
