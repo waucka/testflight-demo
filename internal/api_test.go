@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"bytes"
 	"encoding/base64"
+	"encoding/json"
 	"testing"
 )
 
@@ -263,5 +264,56 @@ func (self *ApiSuite) TestGetChannelInfoBadAuth(c *C) {
 	    response, err := self.authGet(r, self.baduser1.Username, "/channel/" + self.chan1Rec.Slug)
 	    c.Assert(err, IsNil)
 	    c.Assert(response.StatusCode, Equals, http.StatusUnauthorized)
+    })
+}
+
+func (self *ApiSuite) TestGetChannelInfoGoodAuth(c *C) {
+    testflight.WithServer(self.apiConfig.GetRouter(), func(r *testflight.Requester) {
+	    response, err := self.authGet(r, self.user1.Username, "/channel/" + self.chan1Rec.Slug)
+	    c.Assert(err, IsNil)
+	    c.Assert(response.StatusCode, Equals, http.StatusOK)
+    })
+}
+
+func (self *ApiSuite) TestGetChannelInfoBadChannel(c *C) {
+    testflight.WithServer(self.apiConfig.GetRouter(), func(r *testflight.Requester) {
+	    response, err := self.authGet(r, self.user1.Username, "/channel/nosuchchannel")
+	    c.Assert(err, IsNil)
+	    c.Assert(response.StatusCode, Equals, http.StatusNotFound)
+    })
+}
+
+
+func (self *ApiSuite) TestGetItemListBadAuth(c *C) {
+    testflight.WithServer(self.apiConfig.GetRouter(), func(r *testflight.Requester) {
+	    response, err := self.authGet(r, self.baduser1.Username, "/channel/" + self.chan1Rec.Slug + "/item")
+	    c.Assert(err, IsNil)
+	    c.Assert(response.StatusCode, Equals, http.StatusUnauthorized)
+    })
+}
+
+func (self *ApiSuite) TestGetItemListGoodAuth(c *C) {
+    testflight.WithServer(self.apiConfig.GetRouter(), func(r *testflight.Requester) {
+	    response, err := self.authGet(r, self.user1.Username, "/channel/" + self.chan1Rec.Slug + "/item")
+	    c.Assert(err, IsNil)
+	    c.Assert(response.StatusCode, Equals, http.StatusOK)
+	    results := make(map[string]string)
+	    err = json.Unmarshal(response.RawBody, &results)
+	    c.Assert(err, IsNil)
+
+	    title, ok := results[self.item1Rec.Slug]
+	    c.Assert(ok, Equals, true)
+	    c.Assert(title, Equals, self.item1Rec.Title)
+	    title, ok = results[self.item2Rec.Slug]
+	    c.Assert(ok, Equals, true)
+	    c.Assert(title, Equals, self.item2Rec.Title)
+    })
+}
+
+func (self *ApiSuite) TestGetItemListBadChannel(c *C) {
+    testflight.WithServer(self.apiConfig.GetRouter(), func(r *testflight.Requester) {
+	    response, err := self.authGet(r, self.user1.Username, "/channel/nosuchchannel/item")
+	    c.Assert(err, IsNil)
+	    c.Assert(response.StatusCode, Equals, http.StatusNotFound)
     })
 }
