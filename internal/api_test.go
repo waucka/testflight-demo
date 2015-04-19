@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"os"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"bytes"
 	"encoding/base64"
@@ -95,6 +96,17 @@ func (self *ApiSuite) loadTestData(c *C) {
 	c.Log("Loading test data...")
 	dataDir := os.Getenv("TEST_DATADIR")
 
+	self.apiConfig.usercoll.Create(&mgo.CollectionInfo{
+		DisableIdIndex: false,
+		ForceIdIndex: false,
+		Capped: false,
+	})
+	self.apiConfig.chancoll.Create(&mgo.CollectionInfo{
+		DisableIdIndex: false,
+		ForceIdIndex: false,
+		Capped: false,
+	})
+
 	_, err := createUser(self.user1.Username, self.apiConfig.usercoll)
 	c.Assert(err, IsNil)
 	_, err = createUser(self.user2.Username, self.apiConfig.usercoll)
@@ -107,22 +119,24 @@ func (self *ApiSuite) loadTestData(c *C) {
 		Title: "Test Channel 1",
 		Items: make([]*ItemJSONRecord, 0),
 	}
-	createChannel(
+	_, err = createChannel(
 		self.chan1Rec.Slug,
 		self.chan1Rec.Title,
 		self.apiConfig.chancoll,
 	)
+	c.Assert(err, IsNil)
 
 	self.chan2Rec = &ChannelJSONRecord{
 		Slug: "test-channel-2",
 		Title: "Test Channel 2",
 		Items: make([]*ItemJSONRecord, 0),
 	}
-	createChannel(
+	_, err = createChannel(
 		self.chan2Rec.Slug,
 		self.chan2Rec.Title,
 		self.apiConfig.chancoll,
 	)
+	c.Assert(err, IsNil)
 
 	self.item1Rec = &ItemJSONRecord{
 		Slug: "test-item-1",
@@ -138,8 +152,8 @@ func (self *ApiSuite) loadTestData(c *C) {
 		self.apiConfig.chancoll)
 
 	self.item2Rec = &ItemJSONRecord{
-		Slug: "test-item-1",
-		Title: "Test Item 1",
+		Slug: "test-item-2",
+		Title: "Test Item 2",
 		DateUploaded: time.Now(),
 		Uploader: self.user1.Username,
 	}
@@ -181,7 +195,7 @@ func (self *ApiSuite) badAuthDo(requester *testflight.Requester, verb, route, au
 	return requester.Do(req), nil
 }
 
-func (self *ApiSuite) authDo(requester *testflight.Requester, username, verb, route string, body []byte) (*testflight.Response, error) {
+func (self *ApiSuite) authDo(requester *testflight.Requester, username, verb, route string, body []byte, extraHeaders map[string]string) (*testflight.Response, error) {
 	var bodyReader io.Reader = nil
 	if body != nil {
 		bodyReader = bytes.NewBuffer(body)
@@ -191,15 +205,22 @@ func (self *ApiSuite) authDo(requester *testflight.Requester, username, verb, ro
 		return nil, err
 	}
 	req.Header.Add("Authorization", "Bearer SUP3R_S33CR37:" + username)
+	if extraHeaders != nil {
+		for k, v := range(extraHeaders) {
+			req.Header.Add(k, v)
+		}
+	}
 	return requester.Do(req), nil
 }
 
 func (self *ApiSuite) authGet(requester *testflight.Requester, username, route string) (*testflight.Response, error) {
-	return self.authDo(requester, username, "GET", route, nil)
+	return self.authDo(requester, username, "GET", route, nil, nil)
 }
 
-func (self *ApiSuite) authPost(requester *testflight.Requester, username, route string, body []byte) (*testflight.Response, error) {
-	return self.authDo(requester, username, "POST", route, body)
+func (self *ApiSuite) authPost(requester *testflight.Requester, username, route string, params url.Values) (*testflight.Response, error) {
+	extraHeaders := make(map[string]string);
+	extraHeaders["Content-Type"] = "application/x-www-form-urlencoded"
+	return self.authDo(requester, username, "POST", route, []byte(params.Encode()), extraHeaders)
 }
 
 func (self *ApiSuite) TestGetChannelListBadUser(c *C) {
@@ -259,6 +280,61 @@ func (self *ApiSuite) TestGetChannelListGoodAuth(c *C) {
     })
 }
 
+func (self *ApiSuite) TestCreateChannel(c *C) {
+    testflight.WithServer(self.apiConfig.GetRouter(), func(r *testflight.Requester) {
+	    params := url.Values{}
+	    params.Add("slug", "random-text")
+	    params.Add("title", "Random Text")
+	    response, err := self.authPost(r, self.user1.Username, "/channel", params)
+	    c.Assert(err, IsNil)
+	    c.Log(response.Body)
+	    c.Assert(response.StatusCode, Equals, http.StatusNoContent)
+    })
+    testflight.WithServer(self.apiConfig.GetRouter(), func(r *testflight.Requester) {
+	    response, err := self.authGet(r, self.user1.Username, "/channel/random-text")
+	    c.Assert(err, IsNil)
+	    c.Assert(response.StatusCode, Equals, http.StatusOK)
+	    var msg ChannelJSONRecord
+	    err = json.Unmarshal(response.RawBody, &msg)
+	    c.Assert(err, IsNil)
+	    c.Assert(msg.Slug, Equals, "random-text")
+	    c.Assert(msg.Title, Equals, "Random Text")
+    })
+}
+
+func (self *ApiSuite) TestCreateChannelBadRequests(c *C) {
+    testflight.WithServer(self.apiConfig.GetRouter(), func(r *testflight.Requester) {
+	    params := url.Values{}
+	    params.Add("slug", "")
+	    params.Add("title", "Random Text")
+	    response, err := self.authPost(r, self.user1.Username, "/channel", params)
+	    c.Assert(err, IsNil)
+	    c.Log(response.Body)
+	    c.Assert(response.StatusCode, Equals, http.StatusBadRequest)
+    })
+    testflight.WithServer(self.apiConfig.GetRouter(), func(r *testflight.Requester) {
+	    params := url.Values{}
+	    params.Add("slug", "random-text")
+	    params.Add("title", "")
+	    response, err := self.authPost(r, self.user1.Username, "/channel", params)
+	    c.Assert(err, IsNil)
+	    c.Log(response.Body)
+	    c.Assert(response.StatusCode, Equals, http.StatusBadRequest)
+    })
+}
+
+func (self *ApiSuite) TestCreateChannelDuplicateName(c *C) {
+    testflight.WithServer(self.apiConfig.GetRouter(), func(r *testflight.Requester) {
+	    params := url.Values{}
+	    params.Add("slug", self.chan1Rec.Slug)
+	    params.Add("title", "doesn't matter")
+	    response, err := self.authPost(r, self.user1.Username, "/channel", params)
+	    c.Assert(err, IsNil)
+	    c.Log(response.Body)
+	    c.Assert(response.StatusCode, Equals, http.StatusBadRequest)
+    })
+}
+
 func (self *ApiSuite) TestGetChannelInfoBadAuth(c *C) {
     testflight.WithServer(self.apiConfig.GetRouter(), func(r *testflight.Requester) {
 	    response, err := self.authGet(r, self.baduser1.Username, "/channel/" + self.chan1Rec.Slug)
@@ -272,6 +348,11 @@ func (self *ApiSuite) TestGetChannelInfoGoodAuth(c *C) {
 	    response, err := self.authGet(r, self.user1.Username, "/channel/" + self.chan1Rec.Slug)
 	    c.Assert(err, IsNil)
 	    c.Assert(response.StatusCode, Equals, http.StatusOK)
+	    var msg ChannelJSONRecord
+	    err = json.Unmarshal(response.RawBody, &msg)
+	    c.Assert(err, IsNil)
+	    c.Assert(msg.Slug, Equals, self.chan1Rec.Slug)
+	    c.Assert(msg.Title, Equals, self.chan1Rec.Title)
     })
 }
 
@@ -282,7 +363,6 @@ func (self *ApiSuite) TestGetChannelInfoBadChannel(c *C) {
 	    c.Assert(response.StatusCode, Equals, http.StatusNotFound)
     })
 }
-
 
 func (self *ApiSuite) TestGetItemListBadAuth(c *C) {
     testflight.WithServer(self.apiConfig.GetRouter(), func(r *testflight.Requester) {
@@ -313,6 +393,53 @@ func (self *ApiSuite) TestGetItemListGoodAuth(c *C) {
 func (self *ApiSuite) TestGetItemListBadChannel(c *C) {
     testflight.WithServer(self.apiConfig.GetRouter(), func(r *testflight.Requester) {
 	    response, err := self.authGet(r, self.user1.Username, "/channel/nosuchchannel/item")
+	    c.Assert(err, IsNil)
+	    c.Assert(response.StatusCode, Equals, http.StatusNotFound)
+    })
+}
+
+func (self *ApiSuite) TestGetItemBadAuth(c *C) {
+    testflight.WithServer(self.apiConfig.GetRouter(), func(r *testflight.Requester) {
+	    response, err := self.authGet(r, self.baduser1.Username, "/channel/" + self.chan1Rec.Slug + "/item/" + self.item1Rec.Slug)
+	    c.Assert(err, IsNil)
+	    c.Assert(response.StatusCode, Equals, http.StatusUnauthorized)
+    })
+}
+
+func (self *ApiSuite) TestGetItemGoodAuth(c *C) {
+    testflight.WithServer(self.apiConfig.GetRouter(), func(r *testflight.Requester) {
+	    response, err := self.authGet(r, self.user1.Username, "/channel/" + self.chan1Rec.Slug + "/item/" + self.item1Rec.Slug)
+	    c.Log(response.Body)
+	    c.Assert(err, IsNil)
+	    c.Assert(response.StatusCode, Equals, http.StatusOK)
+	    var item ItemJSONRecord
+	    err = json.Unmarshal(response.RawBody, &item)
+	    if err != nil {
+		    var chanDB ChannelDBRecord
+		    err = self.apiConfig.chancoll.FindId(self.chan1Rec.Slug).One(&chanDB)
+		    c.Assert(err, IsNil)
+		    for _, itm := range(chanDB.Items) {
+			    c.Log("Slug: " + itm.Slug + "; Title: " + itm.Title)
+		    }
+	    }
+	    c.Assert(err, IsNil)
+
+	    c.Assert(item.Slug, Equals, self.item1Rec.Slug)
+	    c.Assert(item.Title, Equals, self.item1Rec.Title)
+    })
+}
+
+func (self *ApiSuite) TestGetItemBadChannel(c *C) {
+    testflight.WithServer(self.apiConfig.GetRouter(), func(r *testflight.Requester) {
+	    response, err := self.authGet(r, self.user1.Username, "/channel/nosuchchannel/item/" + self.item1Rec.Slug)
+	    c.Assert(err, IsNil)
+	    c.Assert(response.StatusCode, Equals, http.StatusNotFound)
+    })
+}
+
+func (self *ApiSuite) TestGetItemBadItem(c *C) {
+    testflight.WithServer(self.apiConfig.GetRouter(), func(r *testflight.Requester) {
+	    response, err := self.authGet(r, self.user1.Username, "/channel/" + self.chan1Rec.Slug + "/item/nosuchitem")
 	    c.Assert(err, IsNil)
 	    c.Assert(response.StatusCode, Equals, http.StatusNotFound)
     })

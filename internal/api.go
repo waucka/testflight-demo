@@ -29,6 +29,7 @@ func (self *Config) GetRouter() *gin.Engine {
 	router.Use(AjaxErrorGuard())
 	router.Use(MiddlewareAuth(self.usercoll))
 	router.GET("/channel", self.GetChannelList)
+	router.POST("/channel", self.CreateChannel)
 	router.GET("/channel/:slug", self.GetChannelInfo)
 	router.GET("/channel/:slug/item", self.GetChannelItemList)
 	router.POST("/channel/:slug/item", self.CreateChannelItem)
@@ -54,6 +55,28 @@ func (self *Config) GetChannelList(c *gin.Context) {
 		channelData[chanRec.Slug] = chanRec.Title
 	}
 	c.JSON(http.StatusOK, channelData)
+}
+
+func (self *Config) CreateChannel(c *gin.Context) {
+	_ = forceAuth(c)
+	slug := c.Request.FormValue("slug")
+	title := c.Request.FormValue("title")
+	if slug == "" {
+		BadRequest("slug cannot be empty")
+	}
+	if title == "" {
+		BadRequest("title cannot be empty")
+	}
+	err := self.chancoll.Insert(&ChannelDBRecord{
+		Slug: slug,
+		Title: title,
+		Items: make([]ItemDBRecord, 0),
+	})
+	if err == nil {
+		c.String(http.StatusNoContent, "")
+	} else {
+		BadRequest(err.Error())
+	}
 }
 
 func (self *Config) GetChannelInfo(c *gin.Context) {
@@ -93,5 +116,23 @@ func (self *Config) CreateChannelItem(c *gin.Context) {
 }
 
 func (self *Config) GetChannelItem(c *gin.Context) {
-	InternalError("Not implemented")
+	_ = forceAuth(c)
+
+	slug := c.Params.ByName("slug")
+	itemSlug := c.Params.ByName("itemSlug")
+	var chanRec ChannelDBRecord
+	err := self.chancoll.FindId(slug).One(&chanRec)
+	if err == mgo.ErrNotFound {
+		NotFound("No such channel " + slug)
+	} else if err != nil {
+		InternalError("Could not fetch channel info from database")
+	}
+
+	for _, item := range(chanRec.Items) {
+		if item.Slug == itemSlug {
+			c.JSON(http.StatusOK, item.ToJSON())
+			return
+		}
+	}
+	NotFound("Channel " + slug + " has no item " + itemSlug)
 }
