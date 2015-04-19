@@ -1,0 +1,6 @@
+#!/bin/sh
+
+if gocov test github.com/waucka/testflight-demo/internal > annotation.json; then
+   gocov annotate annotation.json | less
+   gocov report annotation.json
+fi
