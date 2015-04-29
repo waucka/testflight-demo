@@ -36,6 +36,7 @@ func (self *ItemDBRecord) ToJSON() *ItemJSONRecord {
 type ChannelDBRecord struct {
 	Slug  string         "_id,omitempty"
 	Title string         "title"
+	Owner string         "owner"
 	Items []ItemDBRecord "items"
 }
 

@@ -35,6 +35,7 @@ func (self *Config) GetRouter() *gin.Engine {
 	router.GET("/channel/:slug/item", self.GetChannelItemList)
 	router.POST("/channel/:slug/item", self.CreateChannelItem)
 	router.GET("/channel/:slug/item/:itemSlug", self.GetChannelItem)
+	router.GET("/channel/:slug/item/:itemSlug/data", self.GetChannelItemData)
 
 	return router
 }
@@ -51,7 +52,7 @@ func (self *Config) GetChannelList(c *gin.Context) {
 }
 
 func (self *Config) CreateChannel(c *gin.Context) {
-	_ = forceAuth(c)
+	username := forceAuth(c)
 	slug := c.Request.FormValue("slug")
 	title := c.Request.FormValue("title")
 	if slug == "" {
@@ -63,6 +64,7 @@ func (self *Config) CreateChannel(c *gin.Context) {
 	err := self.chancoll.Insert(&ChannelDBRecord{
 		Slug:  slug,
 		Title: title,
+		Owner: username,
 		Items: make([]ItemDBRecord, 0),
 	})
 	if err == nil {
@@ -107,13 +109,16 @@ func (self *Config) GetChannelItemList(c *gin.Context) {
 func (self *Config) CreateChannelItem(c *gin.Context) {
 	username := forceAuth(c)
 	chanSlug := c.Params.ByName("slug")
-	title := c.Params.ByName("title")
-	b64data := c.Params.ByName("b64data")
+	title := c.Request.FormValue("title")
+	b64data := c.Request.FormValue("b64data")
 	itemSlug := c.Request.FormValue("itemSlug")
 	var chanrec ChannelDBRecord
 	err := self.chancoll.FindId(chanSlug).One(&chanrec)
 	if err != nil {
 		InternalError("Cannot fetch channel info from database")
+	}
+	if chanrec.Owner != username {
+		Forbidden("You do not own this channel")
 	}
 	itemrec := &ItemDBRecord{
 		Slug:         itemSlug,
@@ -146,6 +151,28 @@ func (self *Config) GetChannelItem(c *gin.Context) {
 	for _, item := range chanRec.Items {
 		if item.Slug == itemSlug {
 			c.JSON(http.StatusOK, item.ToJSON())
+			return
+		}
+	}
+	NotFound("Channel " + slug + " has no item " + itemSlug)
+}
+
+func (self *Config) GetChannelItemData(c *gin.Context) {
+	_ = forceAuth(c)
+
+	slug := c.Params.ByName("slug")
+	itemSlug := c.Params.ByName("itemSlug")
+	var chanRec ChannelDBRecord
+	err := self.chancoll.FindId(slug).One(&chanRec)
+	if err == mgo.ErrNotFound {
+		NotFound("No such channel " + slug)
+	} else if err != nil {
+		InternalError("Could not fetch channel info from database")
+	}
+
+	for _, item := range chanRec.Items {
+		if item.Slug == itemSlug {
+			c.String(http.StatusOK, item.Data)
 			return
 		}
 	}

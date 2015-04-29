@@ -64,10 +64,11 @@ func createUser(username string, usercoll *mgo.Collection) (*UserDBRecord, error
 	return userrec, err
 }
 
-func createChannel(slug, title string, chancoll *mgo.Collection) (*ChannelDBRecord, error) {
+func createChannel(slug, title, owner string, chancoll *mgo.Collection) (*ChannelDBRecord, error) {
 	chanrec := &ChannelDBRecord{
 		Slug:  slug,
 		Title: title,
+		Owner: owner,
 		Items: make([]ItemDBRecord, 0),
 	}
 	err := chancoll.Insert(chanrec)
@@ -122,6 +123,7 @@ func (self *ApiSuite) loadTestData(c *C) {
 	_, err = createChannel(
 		self.chan1Rec.Slug,
 		self.chan1Rec.Title,
+		self.user1.Username,
 		self.apiConfig.chancoll,
 	)
 	c.Assert(err, IsNil)
@@ -134,6 +136,7 @@ func (self *ApiSuite) loadTestData(c *C) {
 	_, err = createChannel(
 		self.chan2Rec.Slug,
 		self.chan2Rec.Title,
+		self.user2.Username,
 		self.apiConfig.chancoll,
 	)
 	c.Assert(err, IsNil)
@@ -453,5 +456,57 @@ func (self *ApiSuite) TestGetItemBadItem(c *C) {
 		response, err := self.authGet(r, self.user1.Username, "/channel/"+self.chan1Rec.Slug+"/item/nosuchitem")
 		c.Assert(err, IsNil)
 		c.Assert(response.StatusCode, Equals, http.StatusNotFound)
+	})
+}
+
+func (self *ApiSuite) TestCreateItemBadAuth(c *C) {
+	self.CheckBadAuth(c, "POST", "/channel/"+self.chan1Rec.Slug+"/item")
+}
+
+func (self *ApiSuite) TestCreateItem(c *C) {
+	dataDir := os.Getenv("TEST_DATADIR")
+	newItemRec := &ItemJSONRecord{
+		Slug:         "new-item",
+		Title:        "New Item",
+		DateUploaded: time.Now(),
+		Uploader:     self.user1.Username,
+	}
+	rawDataNewItem, err := ioutil.ReadFile(filepath.Join(dataDir, "item1.jpg"))
+	c.Assert(err, IsNil)
+	b64DataNewItem := base64.StdEncoding.EncodeToString(rawDataNewItem)
+
+	expectedUrl := "/channel/" + self.chan1Rec.Slug + "/item/" + newItemRec.Slug
+
+	testflight.WithServer(self.apiConfig.GetRouter(), func(r *testflight.Requester) {
+		params := url.Values{}
+		params.Add("title", newItemRec.Title)
+		params.Add("b64data", b64DataNewItem)
+		params.Add("itemSlug", newItemRec.Slug)
+		response, err := self.authPost(r, self.user1.Username, "/channel/"+self.chan1Rec.Slug+"/item", params)
+		c.Assert(err, IsNil)
+		c.Log(response.Body)
+		c.Assert(response.StatusCode, Equals, http.StatusOK)
+		c.Assert(response.Body, Equals, expectedUrl)
+	})
+	testflight.WithServer(self.apiConfig.GetRouter(), func(r *testflight.Requester) {
+		response, err := self.authGet(r, self.user1.Username, expectedUrl)
+		c.Log(response.Body)
+		c.Assert(err, IsNil)
+		c.Assert(response.StatusCode, Equals, http.StatusOK)
+		var item ItemJSONRecord
+		err = json.Unmarshal(response.RawBody, &item)
+		if err != nil {
+			var chanDB ChannelDBRecord
+			err = self.apiConfig.chancoll.FindId(self.chan1Rec.Slug).One(&chanDB)
+			c.Assert(err, IsNil)
+			for _, itm := range chanDB.Items {
+				c.Log("Slug: " + itm.Slug + "; Title: " + itm.Title)
+			}
+		}
+		c.Assert(err, IsNil)
+
+		c.Assert(item.Slug, Equals, newItemRec.Slug)
+		c.Assert(item.Title, Equals, newItemRec.Title)
+		c.Assert(item.Uploader, Equals, newItemRec.Uploader)
 	})
 }
