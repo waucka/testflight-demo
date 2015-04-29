@@ -154,8 +154,6 @@ func (self *Config) GetChannelItem(c *gin.Context) {
 }
 
 func (self *Config) GetChannelItemData(c *gin.Context) {
-	_ = forceAuth(c)
-
 	slug := c.Params.ByName("slug")
 	itemSlug := c.Params.ByName("itemSlug")
 	var chanRec ChannelDBRecord

@@ -525,4 +525,11 @@ func (self *ApiSuite) TestCreateItem(c *C) {
 		c.Assert(item.Title, Equals, newItemRec.Title)
 		c.Assert(item.Uploader, Equals, newItemRec.Uploader)
 	})
+	testflight.WithServer(self.apiConfig.GetRouter(), func(r *testflight.Requester) {
+		response, err := self.unAuthGet(r, expectedUrl+"/data")
+		c.Assert(err, IsNil)
+		c.Assert(response.StatusCode, Equals, http.StatusOK)
+
+		c.Assert(response.Body, Equals, b64DataNewItem)
+	})
 }
