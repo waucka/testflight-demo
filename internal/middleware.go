@@ -3,10 +3,10 @@ package api
 import (
 	"github.com/gin-gonic/gin"
 	"labix.org/v2/mgo"
+	"log"
 	"net/http"
 	"reflect"
 	"strings"
-	"log"
 )
 
 //WARNING!  The following "authentication" scheme is TERRIBLE!
@@ -47,11 +47,11 @@ func MiddlewareAuth(usercoll *mgo.Collection) gin.HandlerFunc {
 
 type AjaxErrorReport struct {
 	Error string `json:"error"`
-	Info string `json:"info"`
+	Info  string `json:"info"`
 }
 
 func makeAjaxErrorReporter() gin.HandlerFunc {
-	return func (c *gin.Context) {
+	return func(c *gin.Context) {
 		if r := recover(); r != nil {
 			var errorText string
 			status := http.StatusInternalServerError

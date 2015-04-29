@@ -4,11 +4,12 @@ import (
 	"github.com/gin-gonic/gin"
 	"labix.org/v2/mgo"
 	"net/http"
+	"time"
 )
 
 type Config struct {
-	session *mgo.Session
-	db *mgo.Database
+	session  *mgo.Session
+	db       *mgo.Database
 	usercoll *mgo.Collection
 	chancoll *mgo.Collection
 }
@@ -38,14 +39,6 @@ func (self *Config) GetRouter() *gin.Engine {
 	return router
 }
 
-func getUsername(c *gin.Context) string {
-	username, err := c.Get("USERNAME")
-	if err != nil {
-		return ""
-	}
-	return username.(string)
-}
-
 func (self *Config) GetChannelList(c *gin.Context) {
 	_ = forceAuth(c)
 	chanIter := self.chancoll.Find(nil).Iter()
@@ -68,7 +61,7 @@ func (self *Config) CreateChannel(c *gin.Context) {
 		BadRequest("title cannot be empty")
 	}
 	err := self.chancoll.Insert(&ChannelDBRecord{
-		Slug: slug,
+		Slug:  slug,
 		Title: title,
 		Items: make([]ItemDBRecord, 0),
 	})
@@ -105,14 +98,36 @@ func (self *Config) GetChannelItemList(c *gin.Context) {
 	}
 
 	itemData := make(map[string]string)
-	for _, item := range(chanRec.Items) {
+	for _, item := range chanRec.Items {
 		itemData[item.Slug] = item.Title
 	}
 	c.JSON(http.StatusOK, itemData)
 }
 
 func (self *Config) CreateChannelItem(c *gin.Context) {
-	InternalError("Not implemented")
+	username := forceAuth(c)
+	chanSlug := c.Params.ByName("slug")
+	title := c.Params.ByName("title")
+	b64data := c.Params.ByName("b64data")
+	itemSlug := c.Request.FormValue("itemSlug")
+	var chanrec ChannelDBRecord
+	err := self.chancoll.FindId(chanSlug).One(&chanrec)
+	if err != nil {
+		InternalError("Cannot fetch channel info from database")
+	}
+	itemrec := &ItemDBRecord{
+		Slug:         itemSlug,
+		Title:        title,
+		DateUploaded: time.Now(),
+		Data:         b64data,
+		Uploader:     username,
+	}
+	chanrec.Items = append(chanrec.Items, *itemrec)
+	err = self.chancoll.UpdateId(chanSlug, chanrec)
+	if err != nil {
+		InternalError("Cannot update channel info in database")
+	}
+	c.String(http.StatusOK, "/channel/"+chanSlug+"/item/"+itemSlug)
 }
 
 func (self *Config) GetChannelItem(c *gin.Context) {
@@ -128,7 +143,7 @@ func (self *Config) GetChannelItem(c *gin.Context) {
 		InternalError("Could not fetch channel info from database")
 	}
 
-	for _, item := range(chanRec.Items) {
+	for _, item := range chanRec.Items {
 		if item.Slug == itemSlug {
 			c.JSON(http.StatusOK, item.ToJSON())
 			return

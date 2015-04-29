@@ -6,47 +6,47 @@ import (
 
 type ErrorDescription struct {
 	Status int
-	Error string
+	Error  string
 }
 
 func InternalError(msg string) {
 	panic(&ErrorDescription{
 		Status: http.StatusInternalServerError,
-		Error: msg,
+		Error:  msg,
 	})
 }
 
 func Unauthorized(msg string) {
 	panic(&ErrorDescription{
 		Status: http.StatusUnauthorized,
-		Error: msg,
+		Error:  msg,
 	})
 }
 
 func Forbidden(msg string) {
 	panic(&ErrorDescription{
 		Status: http.StatusForbidden,
-		Error: msg,
+		Error:  msg,
 	})
 }
 
 func NotFound(msg string) {
 	panic(&ErrorDescription{
 		Status: http.StatusNotFound,
-		Error: msg,
+		Error:  msg,
 	})
 }
 
 func BadRequest(msg string) {
 	panic(&ErrorDescription{
 		Status: http.StatusBadRequest,
-		Error: msg,
+		Error:  msg,
 	})
 }
 
 func Gone(msg string) {
 	panic(&ErrorDescription{
 		Status: http.StatusGone,
-		Error: msg,
+		Error:  msg,
 	})
 }

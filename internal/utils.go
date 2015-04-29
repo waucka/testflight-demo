@@ -1,13 +1,12 @@
 package api
 
 import (
-	"github.com/gin-gonic/gin"
 	"encoding/json"
-	"strconv"
+	"errors"
+	"github.com/gin-gonic/gin"
+	"io/ioutil"
 	"log"
 	"net/http"
-	"io/ioutil"
-	"errors"
 	"runtime"
 )
 
@@ -26,39 +25,16 @@ func forceAuth(c *gin.Context) string {
 }
 
 func extractJSON(req *http.Request, payload interface{}) {
-        defer req.Body.Close()
-        bodyBytes, err := ioutil.ReadAll(req.Body)
-        if err != nil {
+	defer req.Body.Close()
+	bodyBytes, err := ioutil.ReadAll(req.Body)
+	if err != nil {
 		InternalError(err.Error())
-        }
+	}
 	log.Printf("Body: %s", string(bodyBytes))
-        err = json.Unmarshal(bodyBytes, payload)
-        if err != nil {
-		BadRequest(err.Error())
-        }
-}
-
-func jsonMustEncode(payload interface{}) string {
-	jmsg, err := json.Marshal(payload)
-	if err != nil {
-		InternalError(err.Error())
-	}
-	return string(jmsg)
-}
-
-func jsonMustDecode(jmsg string, payload interface{}) {
-        err := json.Unmarshal([]byte(jmsg), payload)
-        if err != nil {
-		BadRequest(err.Error())
-        }
-}
-
-func mustParseInt(s string, base int, bitSize int) (i int64) {
-	n, err := strconv.ParseInt(s, base, bitSize)
+	err = json.Unmarshal(bodyBytes, payload)
 	if err != nil {
 		BadRequest(err.Error())
 	}
-	return n
 }
 
 func GetStack() string {
