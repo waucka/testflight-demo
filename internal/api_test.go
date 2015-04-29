@@ -479,6 +479,30 @@ func (self *ApiSuite) TestCreateItemBadAuth(c *C) {
 	self.CheckBadAuth(c, "POST", "/channel/"+self.chan1Rec.Slug+"/item")
 }
 
+func (self *ApiSuite) TestCreateItemWrongUser(c *C) {
+	dataDir := os.Getenv("TEST_DATADIR")
+	newItemRec := &ItemJSONRecord{
+		Slug:         "new-item-never-created",
+		Title:        "New Item (Never Created)",
+		DateUploaded: time.Now(),
+		Uploader:     self.user2.Username,
+	}
+	rawDataNewItem, err := ioutil.ReadFile(filepath.Join(dataDir, "item1.jpg"))
+	c.Assert(err, IsNil)
+	b64DataNewItem := base64.StdEncoding.EncodeToString(rawDataNewItem)
+
+	testflight.WithServer(self.apiConfig.GetRouter(), func(r *testflight.Requester) {
+		params := url.Values{}
+		params.Add("title", newItemRec.Title)
+		params.Add("b64data", b64DataNewItem)
+		params.Add("itemSlug", newItemRec.Slug)
+		response, err := self.authPost(r, self.user2.Username, "/channel/"+self.chan1Rec.Slug+"/item", params)
+		c.Assert(err, IsNil)
+		c.Log(response.Body)
+		c.Assert(response.StatusCode, Equals, http.StatusForbidden)
+	})
+}
+
 func (self *ApiSuite) TestCreateItem(c *C) {
 	dataDir := os.Getenv("TEST_DATADIR")
 	newItemRec := &ItemJSONRecord{
