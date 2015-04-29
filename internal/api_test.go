@@ -365,6 +365,18 @@ func (self *ApiSuite) CheckBadAuth(c *C, verb, path string) {
 	})
 }
 
+func (self *ApiSuite) CheckNoAuth(c *C, verb, path string) {
+	testflight.WithServer(self.apiConfig.GetRouter(), func(r *testflight.Requester) {
+		response, err := self.authDo(r, self.baduser1.Username, verb, path, nil, nil)
+		c.Assert(err, IsNil)
+		c.Assert(response.StatusCode, Equals, http.StatusUnauthorized)
+
+		response, err = self.unAuthDo(r, verb, path, nil)
+		c.Assert(err, IsNil)
+		c.Assert(response.StatusCode, Equals, http.StatusOK)
+	})
+}
+
 func (self *ApiSuite) TestGetChannelInfoBadAuth(c *C) {
 	self.CheckBadAuth(c, "GET", "/channel/"+self.chan1Rec.Slug)
 }
@@ -390,8 +402,8 @@ func (self *ApiSuite) TestGetChannelInfoBadChannel(c *C) {
 	})
 }
 
-func (self *ApiSuite) TestGetItemListBadAuth(c *C) {
-	self.CheckBadAuth(c, "GET", "/channel/"+self.chan1Rec.Slug+"/item")
+func (self *ApiSuite) TestGetItemListNoAuth(c *C) {
+	self.CheckNoAuth(c, "GET", "/channel/"+self.chan1Rec.Slug+"/item")
 }
 
 func (self *ApiSuite) TestGetItemListGoodAuth(c *C) {
@@ -418,6 +430,10 @@ func (self *ApiSuite) TestGetItemListBadChannel(c *C) {
 		c.Assert(err, IsNil)
 		c.Assert(response.StatusCode, Equals, http.StatusNotFound)
 	})
+}
+
+func (self *ApiSuite) TestGetItemNoAuth(c *C) {
+	self.CheckNoAuth(c, "GET", "/channel/"+self.chan1Rec.Slug+"/item/"+self.item1Rec.Slug)
 }
 
 func (self *ApiSuite) TestGetItemGoodAuth(c *C) {
