@@ -113,7 +113,7 @@ func (self *Config) CreateChannelItem(c *gin.Context) {
 	var chanrec ChannelDBRecord
 	err := self.chancoll.FindId(chanSlug).One(&chanrec)
 	if err != nil {
-		InternalError("Cannot fetch channel info from database")
+		NotFound("No such channel")
 	}
 	if chanrec.Owner != username {
 		Forbidden("You do not own this channel")
