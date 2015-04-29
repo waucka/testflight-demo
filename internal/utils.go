@@ -1,12 +1,8 @@
 package api
 
 import (
-	"encoding/json"
 	"errors"
 	"github.com/gin-gonic/gin"
-	"io/ioutil"
-	"log"
-	"net/http"
 	"runtime"
 )
 
@@ -22,19 +18,6 @@ func forceAuth(c *gin.Context) string {
 		return username
 	}
 	panic(errors.New("This should not be possible!"))
-}
-
-func extractJSON(req *http.Request, payload interface{}) {
-	defer req.Body.Close()
-	bodyBytes, err := ioutil.ReadAll(req.Body)
-	if err != nil {
-		InternalError(err.Error())
-	}
-	log.Printf("Body: %s", string(bodyBytes))
-	err = json.Unmarshal(bodyBytes, payload)
-	if err != nil {
-		BadRequest(err.Error())
-	}
 }
 
 func GetStack() string {
